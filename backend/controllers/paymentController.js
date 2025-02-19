@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import payment from '../models/paymentModel.js';
 import User from '../models/userAuthModel.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe("sk_test_51QFUdEGwp4u3fMJX68pq4X6drZIGbXTUxNktkV18cWjC6nhFKCwIbiJoYNFSKkric1oRtWAQ0pmMWghXaA6axWs200s79hwsVq");
 
 /**
  * Creates a Stripe Checkout Session and saves an initial payment record.

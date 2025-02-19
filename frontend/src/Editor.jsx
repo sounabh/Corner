@@ -119,7 +119,7 @@ if (response.data?.data) {
 }
 
 getCode()
-    const newSocket = io("https://corner-liard.vercel.app");
+    const newSocket = io("https://corner-sicf.onrender.com");
     setSocket(newSocket);
 
     newSocket.emit("join", { roomId, userName });

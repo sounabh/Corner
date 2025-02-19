@@ -33,7 +33,7 @@ const  createCheckoutSession = async(req,res) => {
             },
           ],
           mode: 'payment',
-          success_url: `https://corner.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
+          success_url: `https://corner-liard.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
           
         });
     

@@ -45,7 +45,9 @@ export default function Signup() {
       // Send POST request to backend API with form data
       const response = await axios.post(
         `${import.meta.env.VITE_API_BACKEND_BASE_URL}/auth/signup`,
-        formData
+        formData,{
+           withCredentials: true
+        }
       );
 
       console.log("====================================");

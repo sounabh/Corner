@@ -25,7 +25,7 @@ const PORT = process.env.PORT || 8000;
 app.use(cookieParser())
 // CORS Configuration
 app.use(cors({
-  origin: 'https://corner-liard.vercel.app/',
+  origin: 'https://corner-liard.vercel.app',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],

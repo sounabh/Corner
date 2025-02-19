@@ -25,18 +25,20 @@ const PORT = process.env.PORT || 8000;
 
 // CORS Configuration
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://corner-geqs.onrender.com'], // Add your frontend origins
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Set-Cookie'],
+  origin: 'http://localhost:5173',
+  credentials:true
+  
+ 
+  
 }));
-
 
 
 // Middleware for parsing cookies and JSON requests
 app.use(cookieParser());
 app.use(express.json());
+
+
+
 
 
 // Middleware for parsing JSON requests

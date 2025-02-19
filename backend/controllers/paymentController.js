@@ -24,6 +24,7 @@ const createCheckoutSession = async (req, res) => {
 
         // Create Stripe checkout session
         const session = await stripe.checkout.sessions.create({
+          customer_email: user.email,
             payment_method_types: ['card'],
             line_items: [{
                 price_data: {
@@ -86,7 +87,7 @@ const handleWebhook = async (req, res) => {
             
             // Find payment record
             const updatedPayment = await payment.findOneAndUpdate(
-                { stripeSessionId: session.id },
+                { user: user._id },
                 {
                     status: 'completed',
                     paymentIntentId: session.payment_intent,

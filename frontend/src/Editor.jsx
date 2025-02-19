@@ -119,7 +119,7 @@ if (response.data?.data) {
 }
 
 getCode()
-    const newSocket = io("http://localhost:5000");
+    const newSocket = io("https://corner-liard.vercel.app");
     setSocket(newSocket);
 
     newSocket.emit("join", { roomId, userName });

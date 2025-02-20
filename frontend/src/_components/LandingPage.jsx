@@ -23,7 +23,7 @@ const LandingPage = () => {
           {/* Logo */}
           <div className="flex items-center space-x-2">
             <Code2 className="h-5 w-5 text-blue-500" />
-            <span className="font-semibold text-lg text-white">CodeAI</span>
+            <span className="font-semibold text-lg text-white">Corner</span>
           </div>
 
           {/* Navigation Links */}
@@ -325,7 +325,7 @@ const LandingPage = () => {
           <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-gray-800">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <Code2 className="h-5 w-5 text-blue-500" />
-              <span className="font-semibold text-white">CodeAI</span>
+              <span className="font-semibold text-white">Corner</span>
             </div>
             <div className="flex items-center space-x-4">
               <button className="text-gray-400 hover:text-white transition-colors">

@@ -1,9 +1,10 @@
+// index.js - Main Server Entry Point
 import express from "express";
 import cors from "cors";
 import { configDotenv } from "dotenv";
 import connectDB from "./database/db.js";
 import authRouter from "./routes/authRoutes.js";
-
+import paymentRouter from "./routes/paymentRoutes.js";
 import roomRouter from "./routes/roomRoutes.js";
 import cookieParser from "cookie-parser";
 import { handleWebhook } from "./controllers/paymentController.js";
@@ -24,21 +25,17 @@ app.use(cors({
   credentials: true
 }));
 
-// Webhook handler must come before any body parsing middleware
-app.post(
-  '/api/payment/webhook',
-  express.raw({ type: 'application/json' }),
-  handleWebhook
-);
-
-// Regular middleware for other routes
+// Regular middleware for all other routes
 app.use(cookieParser());
 app.use(express.json());
+
+// Handle Stripe webhook route first, before any other middleware
+app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), handleWebhook);
 
 // Routes
 app.use("/api/auth", authRouter);
 app.use("/api/editor", roomRouter);
+// Uncomment if you have payment routes
+// app.use("/api/payment", paymentRouter);
 
-
-// Export for testing/startup
 export { app, PORT };

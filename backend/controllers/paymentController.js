@@ -1,4 +1,4 @@
-import stripe from 'stripe';
+import Stripe from 'stripe';
 import payment from '../models/paymentModel.js';
 import User from '../models/userAuthModel.js';
 

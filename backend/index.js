@@ -25,7 +25,7 @@ app.use(cors({
 }));
 
 // Handle Stripe webhook route first, before any other middleware
-app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), paymentRouter);
+app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), handleWebhook );
 
 // Regular middleware for all other routes
 app.use(cookieParser());
@@ -36,6 +36,6 @@ app.use("/api/auth", authRouter);
 app.use("/api/editor", roomRouter);
 
 // Handle all other payment routes after body parsing
-app.use("/api/payment", paymentRouter);
+//app.use("/api/payment", paymentRouter);
 
 export { app, PORT };

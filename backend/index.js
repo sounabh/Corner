@@ -8,8 +8,6 @@ import paymentRouter from "./routes/paymentRoutes.js";
 import roomRouter from "./routes/roomRoutes.js"
 import cookieParser from "cookie-parser";
 
-
-
 // Load environment variables
 configDotenv();
 
@@ -20,28 +18,19 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-
-
-
 // CORS Configuration
 app.use(cors({
-  origin: ['http://localhost:5173','https://corner-liard.vercel.app'],
-  credentials:true
-  
- 
-  
+  origin: ['http://localhost:5173', 'https://corner-liard.vercel.app'],
+  credentials: true
 }));
 
-
-// Middleware for parsing cookies and JSON requests
+// Middleware for parsing cookies
 app.use(cookieParser());
 
+// Webhook endpoint needs raw body
+app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 
-
-
-
-
-// Middleware for parsing JSON requests
+// JSON parsing middleware for all other routes
 app.use((req, res, next) => {
   if (req.originalUrl === '/api/payment/webhook') {
     next();
@@ -50,15 +39,9 @@ app.use((req, res, next) => {
   }
 });
 
-
-
-// Authentication routes
+// Routes
 app.use("/api/auth", authRouter);
-app.use("/api/payment",paymentRouter)
-app.use("/api/editor",roomRouter)
-
-
-
+app.use("/api/payment", paymentRouter);
+app.use("/api/editor", roomRouter);
 
 export { app, PORT }; // Export for socket server usage
-

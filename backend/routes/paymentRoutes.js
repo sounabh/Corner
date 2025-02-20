@@ -1,5 +1,5 @@
 import express from "express"
-import { createCheckoutSession, handleWebhook } from "../controllers/paymentController.js";
+import {  handleWebhook } from "../controllers/paymentController.js";
 
 
 const router = express.Router()

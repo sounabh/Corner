@@ -7,19 +7,33 @@ const stripe = new Stripe("sk_test_51QFUdEGwp4u3fMJX68pq4X6drZIGbXTUxNktkV18cWjC
 const handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
 
+    if (!sig) {
+        console.error("❌ Missing Stripe signature header");
+        return res.status(400).json({ error: "Missing Stripe signature" });
+    }
+
+    let rawBody = req.body;
+
+    // ✅ Ensure `req.body` is a string (convert if it's not raw)
+    if (Buffer.isBuffer(rawBody)) {
+        rawBody = rawBody.toString();
+    } else if (typeof rawBody !== "string") {
+        console.warn("⚠️ req.body is not raw, converting manually");
+        rawBody = JSON.stringify(req.body);
+    }
+
     try {
         const event = stripe.webhooks.constructEvent(
-            req.body, // raw body from express.raw()
+            rawBody,  // ✅ Always passing a raw string
             sig,
             process.env.STRIPE_WEBHOOK_SECRET
         );
 
-        // Log the event type
-        console.log('Webhook received:', event.type);
+        console.log("✅ Webhook verified! Event type:", event.type);
 
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
-            
+
             // Validate session data
             if (!session.customer_details?.email) {
                 console.error('No customer email in session:', session.id);
@@ -48,26 +62,23 @@ const handleWebhook = async (req, res) => {
                 // Update user subscription status
                 await User.findByIdAndUpdate(
                     user._id,
-                    { 
-                        isSubscribed: true,
-                       
-                    },
-                    {new:true}
+                    { isSubscribed: true },
+                    { new: true }
                 );
 
-                console.log('Payment processed successfully:', {
+                console.log('✅ Payment processed successfully:', {
                     paymentId: paymentRecord._id,
                     userId: user._id
                 });
             } catch (error) {
-                console.error('Error processing payment:', error);
+                console.error('❌ Error processing payment:', error);
                 return res.status(500).json({ error: 'Failed to process payment' });
             }
         }
 
         res.json({ received: true });
     } catch (err) {
-        console.error('Webhook verification failed:', err.message);
+        console.error("❌ Webhook verification failed:", err.message);
         return res.status(400).json({ error: `Webhook Error: ${err.message}` });
     }
 };

@@ -5,57 +5,8 @@ import User from '../models/userAuthModel.js';
 const stripe = new Stripe("sk_test_51QFUdEGwp4u3fMJX68pq4X6drZIGbXTUxNktkV18cWjC6nhFKCwIbiJoYNFSKkric1oRtWAQ0pmMWghXaA6axWs200s79hwsVq");
 
 /**
- * Creates a Stripe Checkout Session and saves an initial payment record.
- */
-const createCheckoutSession = async (req, res) => {
-    try {
-        const { amount, userId } = req.body;
-        console.log('Creating checkout session:', { amount, userId });
-
-        if (!amount || !userId) {
-            return res.status(400).json({ error: 'Amount and userId are required' });
-        }
-
-        // Validate user existence
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Create Stripe checkout session
-        const session = await stripe.checkout.sessions.create({
-          customer_email: user.email,
-            payment_method_types: ['card'],
-            line_items: [{
-                price_data: {
-                    currency: 'inr',
-                    product_data: { name: 'Purchase' },
-                    unit_amount: amount * 100, // Convert to cents
-                },
-                quantity: 1,
-            }],
-            mode: 'payment',
-            success_url: `https://corner-liard.vercel.app/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `https://corner-liard.vercel.app/cancel`,
-        });
-
-        // Save initial payment record
-        const newPayment = await payment.create({
-            stripeSessionId: session.id,
-            user: user._id,
-            status: 'pending',
-        });
-
-        console.log('Payment session created:', session.id);
-        res.json({ sessionId: session.id, payment: newPayment });
-    } catch (error) {
-        console.error('Checkout session creation failed:', error);
-        res.status(500).json({ error: 'Payment session creation failed', details: error.message });
-    }
-};
-
-/**
  * Handles Stripe Webhook events.
+ * Processes completed checkout sessions and updates payment and user records.
  */
 const handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -69,8 +20,8 @@ const handleWebhook = async (req, res) => {
             const session = event.data.object;
             console.log('Processing completed checkout session:', session.id);
 
-
- if (!session.customer_details || !session.customer_details.email) {
+            // Validate session data
+            if (!session.customer_details?.email) {
                 console.error('Customer email not found in session:', session.id);
                 return res.status(400).json({ error: 'Customer email not found' });
             }
@@ -81,28 +32,42 @@ const handleWebhook = async (req, res) => {
                 console.error('User not found:', session.customer_details.email);
                 return res.status(404).json({ error: 'User not found' });
             }
+
+            // First try to find existing payment
+            let paymentRecord = await payment.findOne({ stripeSessionId: session.id });
             
-
-
-            
-            // Find payment record
-            const updatedPayment = await payment.findOneAndUpdate(
-                { user: user._id },
-                {
-                    status: 'completed',
-                    paymentIntentId: session.payment_intent,
-                    customerEmail: session.customer_details.email,
-                    updatedAt: new Date()
-                },
-                { new: true }
-            );
-
-            if (!updatedPayment) {
-                console.error('Payment record not found:', session.id);
-                return res.status(404).json({ error: 'Payment record not found' });
+            if (!paymentRecord) {
+                // If no payment record exists, create a new one
+                try {
+                    paymentRecord = await payment.create({
+                        stripeSessionId: session.id,
+                        paymentIntentId: session.payment_intent,
+                        user: user._id,
+                        status: 'completed',
+                        customerEmail: session.customer_details.email,
+                        updatedAt: new Date(),
+                        createdAt: new Date()
+                    });
+                } catch (error) {
+                    console.error('Failed to create new payment record:', error);
+                    return res.status(500).json({ error: 'Failed to create payment record' });
+                }
+            } else {
+                // Update existing payment record
+                paymentRecord = await payment.findOneAndUpdate(
+                    { stripeSessionId: session.id },
+                    {
+                        paymentIntentId: session.payment_intent,
+                        status: 'completed',
+                        customerEmail: session.customer_details.email,
+                        updatedAt: new Date()
+                    },
+                    { new: true }
+                );
             }
 
-             const updatedUser = await User.findByIdAndUpdate(
+            // Update user subscription status
+            const updatedUser = await User.findByIdAndUpdate(
                 user._id,
                 { 
                     isSubscribed: true,
@@ -111,14 +76,26 @@ const handleWebhook = async (req, res) => {
                 { new: true }
             );
 
-           
+            if (!updatedUser) {
+                console.error('Failed to update user subscription status:', user._id);
+                return res.status(500).json({ error: 'Failed to update user subscription' });
+            }
+
+            console.log('Successfully processed payment and updated user:', {
+                paymentId: paymentRecord._id,
+                userId: updatedUser._id,
+                status: paymentRecord.status
+            });
         }
 
         return res.json({ received: true });
     } catch (error) {
         console.error('Webhook error:', error);
-        res.status(400).json({ error: `Webhook Error: ${error.message}`, details: error.stack });
+        return res.status(400).json({ 
+            error: `Webhook Error: ${error.message}`, 
+            details: error.stack 
+        });
     }
 };
 
-export { createCheckoutSession, handleWebhook };
+export { handleWebhook };

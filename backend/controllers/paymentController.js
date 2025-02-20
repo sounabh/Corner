@@ -6,25 +6,16 @@ const stripe = new Stripe("sk_test_51QFUdEGwp4u3fMJX68pq4X6drZIGbXTUxNktkV18cWjC
 
 const handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
+    const rawBody = req.body; // Already in raw Buffer format from express.raw()
 
     if (!sig) {
         console.error("❌ Missing Stripe signature header");
-        return res.status(400).json({ error: "Missing Stripe signature" });
-    }
-
-    let rawBody = req.body;
-
-    // ✅ Ensure `req.body` is a string (convert if it's not raw)
-    if (Buffer.isBuffer(rawBody)) {
-        rawBody = rawBody.toString();
-    } else if (typeof rawBody !== "string") {
-        console.warn("⚠️ req.body is not raw, converting manually");
-        rawBody = JSON.stringify(req.body);
+        return res.status(400).json({ error: "Missing signature" });
     }
 
     try {
         const event = stripe.webhooks.constructEvent(
-            rawBody,  // ✅ Always passing a raw string
+            rawBody, // Pass the raw Buffer directly
             sig,
             process.env.STRIPE_WEBHOOK_SECRET
         );
@@ -34,21 +25,18 @@ const handleWebhook = async (req, res) => {
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
 
-            // Validate session data
-            if (!session.customer_details?.email) {
-                console.error('No customer email in session:', session.id);
+            if (!session?.customer_details?.email) {
+                console.error('❌ Missing customer email in session:', session.id);
                 return res.status(400).json({ error: 'Customer email required' });
             }
 
             try {
-                // Find user by email
                 const user = await User.findOne({ email: session.customer_details.email });
                 if (!user) {
-                    console.error('User not found:', session.customer_details.email);
+                    console.error('❌ User not found:', session.customer_details.email);
                     return res.status(404).json({ error: 'User not found' });
                 }
 
-                // Create payment record
                 const paymentRecord = await payment.create({
                     stripeSessionId: session.id,
                     paymentIntentId: session.payment_intent,
@@ -59,24 +47,20 @@ const handleWebhook = async (req, res) => {
                     updatedAt: new Date()
                 });
 
-                // Update user subscription status
                 await User.findByIdAndUpdate(
                     user._id,
                     { isSubscribed: true },
                     { new: true }
                 );
 
-                console.log('✅ Payment processed successfully:', {
-                    paymentId: paymentRecord._id,
-                    userId: user._id
-                });
+                console.log('✅ Subscription updated for user:', user._id);
             } catch (error) {
-                console.error('❌ Error processing payment:', error);
-                return res.status(500).json({ error: 'Failed to process payment' });
+                console.error('❌ Database error:', error);
+                return res.status(500).json({ error: 'Internal server error' });
             }
         }
 
-        res.json({ received: true });
+        res.status(200).json({ received: true });
     } catch (err) {
         console.error("❌ Webhook verification failed:", err.message);
         return res.status(400).json({ error: `Webhook Error: ${err.message}` });

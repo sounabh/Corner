@@ -24,24 +24,28 @@ app.use(cors({
   credentials: true
 }));
 
-// Middleware for parsing cookies
-app.use(cookieParser());
-
-// Webhook endpoint needs raw body
-app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
-
-// JSON parsing middleware for all other routes
+// Important: Place raw body parser before cookie parser and other middleware
 app.use((req, res, next) => {
   if (req.originalUrl === '/api/payment/webhook') {
-    next();
+    let rawBody = '';
+    req.setEncoding('utf8');
+    req.on('data', chunk => { rawBody += chunk; });
+    req.on('end', () => {
+      req.rawBody = rawBody;
+      next();
+    });
   } else {
-    express.json()(req, res, next);
+    next();
   }
 });
+
+// Other middleware
+app.use(cookieParser());
+app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRouter);
 app.use("/api/payment", paymentRouter);
 app.use("/api/editor", roomRouter);
 
-export { app, PORT }; // Export for socket server usage
+export { app, PORT };

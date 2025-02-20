@@ -24,28 +24,18 @@ app.use(cors({
   credentials: true
 }));
 
-// Important: Place raw body parser before cookie parser and other middleware
-app.use((req, res, next) => {
-  if (req.originalUrl === '/api/payment/webhook') {
-    let rawBody = '';
-    req.setEncoding('utf8');
-    req.on('data', chunk => { rawBody += chunk; });
-    req.on('end', () => {
-      req.rawBody = rawBody;
-      next();
-    });
-  } else {
-    next();
-  }
-});
+// Handle Stripe webhook route first, before any other middleware
+app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), paymentRouter);
 
-// Other middleware
+// Regular middleware for all other routes
 app.use(cookieParser());
 app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRouter);
-app.use("/api/payment", paymentRouter);
 app.use("/api/editor", roomRouter);
+
+// Handle all other payment routes after body parsing
+app.use("/api/payment", paymentRouter);
 
 export { app, PORT };

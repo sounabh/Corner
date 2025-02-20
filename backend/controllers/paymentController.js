@@ -63,8 +63,9 @@ const handleWebhook = async (req, res) => {
                 user._id,
                 { 
                     isSubscribed: true,
-                    updatedAt: new Date()
-                }
+                    
+                },
+                { new: true }
             );
 
             console.log('Payment processed successfully:', {

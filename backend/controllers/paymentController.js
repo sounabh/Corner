@@ -4,26 +4,40 @@ import User from '../models/userAuthModel.js';
 
 const stripe = new Stripe("sk_test_51QFUdEGwp4u3fMJX68pq4X6drZIGbXTUxNktkV18cWjC6nhFKCwIbiJoYNFSKkric1oRtWAQ0pmMWghXaA6axWs200s79hwsVq");
 
-/**
- * Handles Stripe Webhook events.
- * Processes completed checkout sessions and updates payment and user records.
- */
 const handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
 
     try {
-        // Verify webhook signature
-        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        // Log incoming webhook details for debugging
+        console.log('Webhook Headers:', req.headers);
+        console.log('Webhook Signature:', sig);
+        
+        // Use the raw body we captured earlier
+        const payload = req.rawBody;
+        
+        try {
+            event = stripe.webhooks.constructEvent(
+                payload,
+                sig,
+                process.env.STRIPE_WEBHOOK_SECRET
+            );
+        } catch (err) {
+            console.error('Webhook signature verification failed:', err.message);
+            console.log('Payload received:', payload);
+            return res.status(400).send(`Webhook Error: ${err.message}`);
+        }
 
+        // Handle the event
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
-            console.log('Processing completed checkout session:', session.id);
+            
+            // Log the session for debugging
+            console.log('Processing checkout session:', session);
 
-            // Validate session data
             if (!session.customer_details?.email) {
-                console.error('Customer email not found in session:', session.id);
-                return res.status(400).json({ error: 'Customer email not found' });
+                console.error('No customer email in session:', session.id);
+                return res.status(400).json({ error: 'Customer email required' });
             }
 
             // Find user by email
@@ -33,68 +47,37 @@ const handleWebhook = async (req, res) => {
                 return res.status(404).json({ error: 'User not found' });
             }
 
-            // First try to find existing payment
-            let paymentRecord = await payment.findOne({ stripeSessionId: session.id });
-            
-            if (!paymentRecord) {
-                // If no payment record exists, create a new one
-                try {
-                    paymentRecord = await payment.create({
-                        stripeSessionId: session.id,
-                        paymentIntentId: session.payment_intent,
-                        user: user._id,
-                        status: 'completed',
-                        customerEmail: session.customer_details.email,
-                        updatedAt: new Date(),
-                        createdAt: new Date()
-                    });
-                } catch (error) {
-                    console.error('Failed to create new payment record:', error);
-                    return res.status(500).json({ error: 'Failed to create payment record' });
-                }
-            } else {
-                // Update existing payment record
-                paymentRecord = await payment.findOneAndUpdate(
-                    { stripeSessionId: session.id },
-                    {
-                        paymentIntentId: session.payment_intent,
-                        status: 'completed',
-                        customerEmail: session.customer_details.email,
-                        updatedAt: new Date()
-                    },
-                    { new: true }
-                );
-            }
+            // Create payment record
+            const paymentRecord = await payment.create({
+                stripeSessionId: session.id,
+                paymentIntentId: session.payment_intent,
+                user: user._id,
+                status: 'completed',
+                customerEmail: session.customer_details.email,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            });
 
             // Update user subscription status
-            const updatedUser = await User.findByIdAndUpdate(
+            await User.findByIdAndUpdate(
                 user._id,
                 { 
                     isSubscribed: true,
-                    
-                },
-                { new: true }
+                    updatedAt: new Date()
+                }
             );
 
-            if (!updatedUser) {
-                console.error('Failed to update user subscription status:', user._id);
-                return res.status(500).json({ error: 'Failed to update user subscription' });
-            }
-
-            console.log('Successfully processed payment and updated user:', {
+            console.log('Payment processed successfully:', {
                 paymentId: paymentRecord._id,
-                userId: updatedUser._id,
-                status: paymentRecord.status
+                userId: user._id
             });
         }
 
-        return res.json({ received: true });
-    } catch (error) {
-        console.error('Webhook error:', error);
-        return res.status(400).json({ 
-            error: `Webhook Error: ${error.message}`, 
-            details: error.stack 
-        });
+        // Send success response
+        res.json({ received: true });
+    } catch (err) {
+        console.error('Webhook processing error:', err);
+        res.status(500).json({ error: 'Webhook processing failed' });
     }
 };
 

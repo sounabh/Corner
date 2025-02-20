@@ -4,7 +4,7 @@ import { createCheckoutSession, handleWebhook } from "../controllers/paymentCont
 
 const router = express.Router()
 
-router.post('/create-checkout', createCheckoutSession);
+//router.post('/create-checkout', createCheckoutSession);
 router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
 //router.get('/status/:sessionId', getPaymentStatus);
 

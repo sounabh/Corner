@@ -7,6 +7,8 @@ import authRouter from "./routes/authRoutes.js";
 import paymentRouter from "./routes/paymentRoutes.js";
 import roomRouter from "./routes/roomRoutes.js"
 import cookieParser from "cookie-parser";
+import { handleWebhook } from "./controllers/paymentController.js";
+
 
 // Load environment variables
 configDotenv();

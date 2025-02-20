@@ -1,4 +1,4 @@
-// index.js - Main Server Entry Point
+// index.js
 import express from "express";
 import cors from "cors";
 import { configDotenv } from "dotenv";
@@ -19,23 +19,27 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// CORS Configuration
+// Important: Place the webhook route BEFORE CORS middleware and body parsers
+// This route needs the raw body for signature verification
+app.post(
+    '/api/payment/webhook',
+    express.raw({ type: 'application/json' }),
+    handleWebhook
+);
+
+// CORS Configuration - after webhook route
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://corner-liard.vercel.app'],
-  credentials: true
+    origin: ['http://localhost:5173', 'https://corner-liard.vercel.app'],
+    credentials: true
 }));
 
 // Regular middleware for all other routes
 app.use(cookieParser());
 app.use(express.json());
 
-// Handle Stripe webhook route first, before any other middleware
-app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), handleWebhook);
-
 // Routes
 app.use("/api/auth", authRouter);
 app.use("/api/editor", roomRouter);
-// Uncomment if you have payment routes
-// app.use("/api/payment", paymentRouter);
+//app.use("/api/payment", paymentRouter);
 
 export { app, PORT };

@@ -27,6 +27,7 @@ const handleWebhook = async (req, res) => {
     switch (event.type) {
       case 'checkout.session.completed':
         const session = event.data.object;
+        console.log(session)
         
         try {
           // Validate session data

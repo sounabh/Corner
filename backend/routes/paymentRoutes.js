@@ -1,9 +1,13 @@
-import express from "express";
+import express from "express"
 import { handleWebhook } from "../controllers/paymentController.js";
 
-const router = express.Router();
 
-// Note: We don't need express.raw here anymore as it's handled in main app
-router.post('/webhook', handleWebhook);
+const router = express.Router()
 
-export default router;
+
+router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+//router.get('/status/:sessionId', getPaymentStatus);
+
+
+
+export default router

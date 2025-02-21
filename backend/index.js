@@ -45,6 +45,9 @@ app.use(cookieParser());
 // Middleware for parsing JSON requests
 app.use((req, res, next) => {
   if (req.originalUrl === '/api/payment/webhook') {
+    console.log("a",req.body)
+    express.raw({ type: 'application/json' })
+     console.log("b",req.body)
     next();
   } else {
     express.json()(req, res, next);

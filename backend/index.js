@@ -26,7 +26,7 @@ const PORT = process.env.PORT || 8000;
 
 // CORS Configuration
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: ['http://localhost:5173','https://corner-liard.vercel.app'],
   credentials:true
   
  

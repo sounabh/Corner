@@ -62,7 +62,7 @@ const EditorComponent = () => {
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [compilerOutput, setCompilerOutput] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
-  const [showVideoCall,setShowVideoCall] = useState(false)
+  const [showVideoCall,setShowVideoCall] = useState(true)
 
   const user = useAuthStore(state => state.user);
   const token = useAuthStore(state => state.token);
@@ -108,7 +108,7 @@ const response = await axios.get(`${import.meta.env.VITE_API_BACKEND_BASE_URL}/e
   }
 })
 console.log(response);
-setShowVideoCall(response.data.subscription)
+//setShowVideoCall(response.data.subscription)
 if (response.data?.data) {
   setCodeStates((prev) => ({
     ...prev,

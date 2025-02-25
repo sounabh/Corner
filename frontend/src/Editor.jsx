@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 /* eslint-disable no-unused-vars */
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import io from "socket.io-client";
 import {NavLink} from "react-router-dom"
@@ -8,13 +8,6 @@ import { Eye, EyeOff, Moon, Play, Save, Sun, Videotape, X } from "lucide-react";
 import axios from "axios";
 import useAuthStore from "./store/authStore";
 import { useParams } from "react-router";
-
-
-
-
-
-
-
 
 // Constants for supported languages and their configurations
 const SUPPORTED_LANGUAGES = {
@@ -62,14 +55,16 @@ const EditorComponent = () => {
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [compilerOutput, setCompilerOutput] = useState("");
   const [isCompiling, setIsCompiling] = useState(false);
-  const [showVideoCall,setShowVideoCall] = useState(true)
+  const [showVideoCall, setShowVideoCall] = useState(true);
+  
+  // Refs for editors and local edits tracking
+  const editorRefs = useRef({});
+  const isLocalEdit = useRef(false);
 
   const user = useAuthStore(state => state.user);
   const token = useAuthStore(state => state.token);
 
-  const params = useParams()
-
-
+  const params = useParams();
 
   // Code states for each language
   const [codeStates, setCodeStates] = useState(
@@ -87,7 +82,7 @@ const EditorComponent = () => {
 
   // Room and user configuration
   const roomId = params.roomId;
-  const userName = user.name
+  const userName = user.name;
 
   // Theme toggle handler
   const toggleTheme = () => {
@@ -95,30 +90,31 @@ const EditorComponent = () => {
     document.body.classList.toggle("lightMode");
   };
 
-
+  // Handle editor mount
+  const handleEditorDidMount = (editor, language) => {
+    editorRefs.current[language] = editor;
+  };
 
   // Socket connection setup
   useEffect(() => {
+    const getCode = async() => {
+      const response = await axios.get(`${import.meta.env.VITE_API_BACKEND_BASE_URL}/editor/${params.roomId}`,{
+        headers:{
+          authorization : `Bearer ${token}`
+        }
+      });
+      console.log(response);
+      //setShowVideoCall(response.data.subscription)
+      if (response.data?.data) {
+        setCodeStates((prev) => ({
+          ...prev,
+          ...response.data.data, // Merge saved codes with existing ones
+        }));
+      }
+    };
 
-
-const getCode = async() => {
-const response = await axios.get(`${import.meta.env.VITE_API_BACKEND_BASE_URL}/editor/${params.roomId}`,{
-  headers:{
-    authorization : `Bearer ${token}`
-  }
-})
-console.log(response);
-//setShowVideoCall(response.data.subscription)
-if (response.data?.data) {
-  setCodeStates((prev) => ({
-    ...prev,
-    ...response.data.data, // Merge saved codes with existing ones
-  }));
-}
-
-}
-
-getCode()
+    getCode();
+    
     const newSocket = io("https://corner-sicf.onrender.com");
     setSocket(newSocket);
 
@@ -127,17 +123,41 @@ getCode()
     const socketEventHandlers = {
       userList: (users) => setUserList(users),
       codeUpdate: ({ language, code }) => {
-        // Prevent unnecessary re-renders and potential infinite loops
-        setCodeStates((prev) => {
-          if (prev[language] !== code) {
-            return { ...prev, [language]: code };
-          }
-          return prev;
-        });
+        // Skip update if this is a local edit that we already processed
+        if (isLocalEdit.current) {
+          isLocalEdit.current = false;
+          return;
+        }
+        
+        // Handle remote update - save cursor position before update
+        const editor = editorRefs.current[language];
+        if (editor && editor.getModel()) {
+          const currentPosition = editor.getPosition();
+          
+          setCodeStates((prev) => {
+            if (prev[language] !== code) {
+              return { ...prev, [language]: code };
+            }
+            return prev;
+          });
+          
+          // Restore cursor position after state update in next tick
+          setTimeout(() => {
+            if (editor && currentPosition) {
+              editor.setPosition(currentPosition);
+              editor.revealPositionInCenter(currentPosition);
+            }
+          }, 0);
+        } else {
+          // No editor reference yet, just update the state
+          setCodeStates((prev) => {
+            if (prev[language] !== code) {
+              return { ...prev, [language]: code };
+            }
+            return prev;
+          });
+        }
       },
-   
-      
-     
       codeResponse: (response) => {
         setCompilerOutput(response.run.output);
         setIsCompiling(false);
@@ -152,7 +172,6 @@ getCode()
       Object.keys(socketEventHandlers).forEach((event) => {
         newSocket.off(event);
       });
-     
       newSocket.disconnect();
     };
   }, []);
@@ -160,16 +179,25 @@ getCode()
   // Code change handler
   const handleCodeChange = (language) => (value) => {
     const newCode = value || "";
+    
+    // Mark this as a local edit to avoid cursor position issues
+    isLocalEdit.current = true;
+    
     setCodeStates((prev) => ({ ...prev, [language]: newCode }));
 
     socket?.emit("userTyping", { roomId, userName });
     
-    socket?.emit("codeChange", { 
-      roomId, 
-      language, 
-      code: newCode 
-    },200);
-  }
+    // Add a small debounce for network performance
+    const timeoutId = setTimeout(() => {
+      socket?.emit("codeChange", { 
+        roomId, 
+        language, 
+        code: newCode 
+      });
+    }, 200);
+    
+    return () => clearTimeout(timeoutId);
+  };
 
   // Compilation handler
   const handleCompile = () => {
@@ -230,7 +258,6 @@ getCode()
       {}
     );
 
-
     // Only save if there's at least one non-empty code
     if (Object.keys(nonEmptyCode).length > 0) {
       const savedCodeObj = {
@@ -239,17 +266,14 @@ getCode()
         codes: nonEmptyCode,
       };
 
-
       setSavedCodes((prev) => [...prev, savedCodeObj]);
       console.log("Saved Codes:", savedCodeObj);
-      const response = await axios.post(`${import.meta.env.VITE_API_BACKEND_BASE_URL}/editor/${params.roomId}/code-save`,{codes:savedCodeObj.codes},{
-        withCredentials:true,
-        headers:{
-          authorization : `Bearer ${token}`
+      const response = await axios.post(`${import.meta.env.VITE_API_BACKEND_BASE_URL}/editor/${params.roomId}/code-save`, {codes:savedCodeObj.codes}, {
+        withCredentials: true,
+        headers: {
+          authorization: `Bearer ${token}`
         }
-      })
-
-      
+      });
     }
   };
 
@@ -292,11 +316,10 @@ getCode()
           {/* Controls - More compact and consistent */}
           <div className="flex items-center space-x-2">
             {showVideoCall ? <NavLink to={"/video"}>
-<button className="p-1.5 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors">
-<Videotape size={16}></Videotape>
-</button>
-</NavLink> : ""}
-
+              <button className="p-1.5 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors">
+                <Videotape size={16}></Videotape>
+              </button>
+            </NavLink> : ""}
 
             <button
               onClick={toggleTheme}
@@ -360,6 +383,7 @@ getCode()
             language={tab}
             value={codeStates[tab]}
             onChange={handleCodeChange(tab)}
+            onMount={(editor) => handleEditorDidMount(editor, tab)}
             options={{
               minimap: { enabled: true },
               fontSize: 14,
